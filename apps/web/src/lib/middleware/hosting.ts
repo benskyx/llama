@@ -64,7 +64,7 @@ export default async function HostingMiddleware(
     key = slug;
   }
 
-  const hosting = await getHosting(key, mode, req.nextUrl.origin);
+  const hosting = await getHosting(key, mode, req.nextUrl.origin || "");
 
   // 404
   if (!hosting) {
