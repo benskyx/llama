@@ -1,7 +1,6 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { parse } from "@/lib/middleware/utils";
-import { getSessionCookie } from "better-auth/cookies";
+import { getSessionToken, parse } from "@/lib/middleware/utils";
 
 import { HOSTING_PREFIX } from "../constants";
 import HostingMiddleware from "./hosting";
@@ -16,17 +15,17 @@ export default function AppMiddleware(
     return HostingMiddleware(req, event, "path");
   }
 
-  const sessionCookie = getSessionCookie(req);
+  const sessionToken = getSessionToken(req);
 
   // if the user is not logged in, and is trying to access a dashboard page, redirect to login
   if (
-    !sessionCookie &&
+    !sessionToken &&
     !(path.startsWith("/login") || path.startsWith("/invitation"))
   ) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (sessionCookie) {
+  if (sessionToken) {
     // if the user is logged in, and is trying to access the login page, redirect to dashboard
     if (path.startsWith("/login")) {
       return NextResponse.redirect(new URL("/", req.url));

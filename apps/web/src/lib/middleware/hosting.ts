@@ -1,7 +1,6 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { parse } from "@/lib/middleware/utils";
-import { getSessionCookie } from "better-auth/cookies";
+import { getSessionToken, parse } from "@/lib/middleware/utils";
 
 import { HOSTING_PREFIX } from "../constants";
 import { getMiddlewareSession } from "./get-session";
@@ -76,12 +75,12 @@ export default async function HostingMiddleware(
     return NextResponse.next();
   }
 
-  const sessionCookie = getSessionCookie(req);
+  const sessionToken = getSessionToken(req);
 
   if (fullPath === "/login") {
     // if the domain is not protected, or there is a session cookie
     // AND the path is /login, redirect to /
-    if (!hosting.protected || sessionCookie) {
+    if (!hosting.protected || sessionToken) {
       const homeUrl = new URL(
         mode === "domain" ? "/" : `${HOSTING_PREFIX}${hosting.slug}`,
         req.url,
@@ -94,7 +93,7 @@ export default async function HostingMiddleware(
   }
 
   if (hosting.protected) {
-    const session = sessionCookie ? await getMiddlewareSession(req) : null;
+    const session = sessionToken ? await getMiddlewareSession(req) : null;
 
     // if the hosting is protected and there is no session, redirect to login
     if (!session) {
