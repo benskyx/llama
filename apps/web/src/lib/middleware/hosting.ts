@@ -5,6 +5,7 @@ import { getSessionCookie } from "better-auth/cookies";
 
 import { HOSTING_PREFIX } from "../constants";
 import { getMiddlewareSession } from "./get-session";
+import { getSafeOrigin } from "./origin";
 
 // Define the Hosting type based on what the API returns
 type Hosting = {
@@ -59,12 +60,13 @@ export default async function HostingMiddleware(
     // fullPath will looks like this: /a/my-slug/...
     // we need to get the slug and the rest of the path
     const slug = path.replace(HOSTING_PREFIX, "").split("/")[0];
-    fullPath = fullPath.replace(`${HOSTING_PREFIX}${slug} `, "");
+    fullPath = fullPath.replace(`${HOSTING_PREFIX}${slug}`, "");
     if (fullPath === "") fullPath = "/";
     key = slug;
   }
 
-  const hosting = await getHosting(key, mode, req.nextUrl.origin || "");
+  const origin = getSafeOrigin(req);
+  const hosting = await getHosting(key, mode, origin);
 
   // 404
   if (!hosting) {
@@ -81,14 +83,14 @@ export default async function HostingMiddleware(
     // AND the path is /login, redirect to /
     if (!hosting.protected || sessionCookie) {
       const homeUrl = new URL(
-        mode === "domain" ? "/" : `${HOSTING_PREFIX}${hosting.slug} `,
+        mode === "domain" ? "/" : `${HOSTING_PREFIX}${hosting.slug}`,
         req.url,
       );
       return NextResponse.redirect(homeUrl);
     }
 
     // otherwise, rewrite to the login page
-    return NextResponse.rewrite(new URL(`/ ${hosting.id}${fullPath} `, req.url));
+    return NextResponse.rewrite(new URL(`/${hosting.id}${fullPath}`, req.url));
   }
 
   if (hosting.protected) {
@@ -97,7 +99,7 @@ export default async function HostingMiddleware(
     // if the hosting is protected and there is no session, redirect to login
     if (!session) {
       const loginUrl = new URL(
-        `/ login${mode === "path" ? `?r=${encodeURIComponent(`${HOSTING_PREFIX}${hosting.slug}`)}` : ""} `,
+        `/login${mode === "path" ? `?r=${encodeURIComponent(`${HOSTING_PREFIX}${hosting.slug}`)}` : ""}`,
         req.url,
       );
       return NextResponse.redirect(loginUrl);
@@ -120,7 +122,7 @@ export default async function HostingMiddleware(
       try {
         const apiUrl = new URL(
           "/api/internal/hosting/member",
-          req.nextUrl.origin,
+          origin,
         );
         apiUrl.searchParams.set("userId", session.user.id);
         apiUrl.searchParams.set("namespaceId", hosting.namespaceId);
@@ -139,7 +141,7 @@ export default async function HostingMiddleware(
       // if they're not a member, rewrite to not-allowed
       if (!isMember) {
         return NextResponse.rewrite(
-          new URL(`/ ${hosting.id}/not-allowed`, req.url),
+          new URL(`/${hosting.id}/not-allowed`, req.url),
         );
       }
     }

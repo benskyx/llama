@@ -1,9 +1,11 @@
 import type { NextRequest } from "next/server";
 
 import type { Session } from "../auth-types";
+import { getSafeOrigin } from "./origin";
 
 export const getMiddlewareSession = async (req: NextRequest) => {
-  const url = `${req.nextUrl.origin}/api/auth/get-session`;
+  const origin = getSafeOrigin(req);
+  const url = `${origin}/api/auth/get-session`;
 
   const response = await fetch(url, {
     headers: {
