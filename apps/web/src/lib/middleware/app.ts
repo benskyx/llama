@@ -3,13 +3,10 @@ import { NextResponse } from "next/server";
 import { parse } from "@/lib/middleware/utils";
 import { getSessionCookie } from "better-auth/cookies";
 
-import { db } from "@agentset/db";
-
 import { HOSTING_PREFIX } from "../constants";
-import { getMiddlewareSession } from "./get-session";
 import HostingMiddleware from "./hosting";
 
-export default async function AppMiddleware(
+export default function AppMiddleware(
   req: NextRequest,
   event: NextFetchEvent,
 ) {
@@ -33,34 +30,6 @@ export default async function AppMiddleware(
     // if the user is logged in, and is trying to access the login page, redirect to dashboard
     if (path.startsWith("/login")) {
       return NextResponse.redirect(new URL("/", req.url));
-    }
-
-    // redirect to the default org
-    if (path === "/") {
-      const session = await getMiddlewareSession(req);
-      if (!session) {
-        return NextResponse.redirect(new URL("/login", req.url));
-      }
-
-      const org = await db.organization.findFirst({
-        where: session.session.activeOrganizationId
-          ? {
-              id: session.session.activeOrganizationId,
-            }
-          : {
-              members: {
-                some: {
-                  userId: session.user.id,
-                },
-              },
-            },
-        select: {
-          slug: true,
-        },
-      });
-
-      if (org) return NextResponse.redirect(new URL(`/${org.slug}`, req.url));
-      return NextResponse.redirect(new URL("/create-organization", req.url));
     }
   }
 
