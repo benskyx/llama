@@ -1,46 +1,54 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getSessionToken, parse } from "@/lib/middleware/utils";
+import { parse } from "@/lib/middleware/utils";
+import { getCache } from "@vercel/functions";
+import { getSessionCookie } from "better-auth/cookies";
+
+import type { Prisma } from "@agentset/db";
+import { db } from "@agentset/db";
 
 import { HOSTING_PREFIX } from "../constants";
 import { getMiddlewareSession } from "./get-session";
-import { getSafeOrigin } from "./origin";
 
-// Define the Hosting type based on what the API returns
-type Hosting = {
-  id: string;
-  slug: string;
-  protected: boolean;
-  allowedEmailDomains: string[];
-  allowedEmails: string[];
-  namespaceId: string;
-} | null;
+const getHosting = async (where: Prisma.HostingWhereInput) => {
+  return db.hosting.findFirst({
+    where,
+    select: {
+      id: true,
+      slug: true,
+      protected: true,
+      allowedEmailDomains: true,
+      allowedEmails: true,
+      namespaceId: true,
+    },
+  });
+};
 
-const getHosting = async (
-  key: string,
-  mode: "domain" | "path",
-  origin: string,
+type Hosting = Awaited<ReturnType<typeof getHosting>>;
+
+const getCachedHosting = async (
+  filter: { key: string; where: Prisma.HostingWhereInput },
+  event: NextFetchEvent,
 ) => {
-  try {
-    const apiUrl = new URL("/api/internal/hosting/resolve", origin);
-    apiUrl.searchParams.set("key", key);
-    apiUrl.searchParams.set("mode", mode);
+  let hosting: Hosting = null;
+  const cache = getCache();
+  const cachedHosting = await cache.get(filter.key);
 
-    const res = await fetch(apiUrl.toString(), {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      next: { revalidate: 60 }, // Cache for 60 seconds
-    });
+  if (cachedHosting) return cachedHosting as unknown as Hosting;
 
-    if (res.ok) {
-      return (await res.json()) as Hosting;
-    }
-    return null;
-  } catch (error) {
-    console.error("Error fetching hosting:", error);
-    return null;
+  hosting = await getHosting(filter.where);
+
+  // cache the hosting in background
+  if (hosting) {
+    event.waitUntil(
+      cache.set(filter.key, hosting, {
+        ttl: 3600, // 1 hour
+        tags: [`hosting:${hosting.id}`],
+      }),
+    );
   }
+
+  return hosting;
 };
 
 export default async function HostingMiddleware(
@@ -50,37 +58,45 @@ export default async function HostingMiddleware(
 ) {
   const { domain, path, fullPath: _fullPath } = parse(req);
 
-  let key: string;
+  let filter: { key: string; where: Prisma.HostingWhereInput };
   let fullPath = _fullPath;
-
   if (mode === "domain") {
-    key = domain;
+    filter = {
+      key: `domain:${domain}`,
+      where: {
+        domain: {
+          slug: domain,
+        },
+      },
+    };
   } else {
     // fullPath will looks like this: /a/my-slug/...
     // we need to get the slug and the rest of the path
     const slug = path.replace(HOSTING_PREFIX, "").split("/")[0];
     fullPath = fullPath.replace(`${HOSTING_PREFIX}${slug}`, "");
     if (fullPath === "") fullPath = "/";
-    key = slug;
+
+    filter = {
+      key: `slug:${slug}`,
+      where: {
+        slug,
+      },
+    };
   }
 
-  const origin = getSafeOrigin(req);
-  const hosting = await getHosting(key, mode, origin);
+  const hosting = await getCachedHosting(filter, event);
 
   // 404
   if (!hosting) {
-    // Instead of erroring, we pass through. 
-    // This avoids crashing if the API is down or slow.
-    // The app will likely 404 if the rewrite doesn't happen, which is correct.
-    return NextResponse.next();
+    return NextResponse.error();
   }
 
-  const sessionToken = getSessionToken(req);
+  const sessionCookie = getSessionCookie(req);
 
   if (fullPath === "/login") {
     // if the domain is not protected, or there is a session cookie
     // AND the path is /login, redirect to /
-    if (!hosting.protected || sessionToken) {
+    if (!hosting.protected || sessionCookie) {
       const homeUrl = new URL(
         mode === "domain" ? "/" : `${HOSTING_PREFIX}${hosting.slug}`,
         req.url,
@@ -93,7 +109,7 @@ export default async function HostingMiddleware(
   }
 
   if (hosting.protected) {
-    const session = sessionToken ? await getMiddlewareSession(req) : null;
+    const session = sessionCookie ? await getMiddlewareSession(req) : null;
 
     // if the hosting is protected and there is no session, redirect to login
     if (!session) {
@@ -116,29 +132,25 @@ export default async function HostingMiddleware(
       !allowedEmails.includes(email) &&
       !allowedEmailDomains.includes(emailDomain)
     ) {
-      // check if they're members via internal API
-      let isMember = false;
-      try {
-        const apiUrl = new URL(
-          "/api/internal/hosting/member",
-          origin,
-        );
-        apiUrl.searchParams.set("userId", session.user.id);
-        apiUrl.searchParams.set("namespaceId", hosting.namespaceId);
-
-        const res = await fetch(apiUrl.toString(), {
-          next: { revalidate: 60 },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          isMember = data.isMember;
-        }
-      } catch (error) {
-        console.error("Failed to check membership", error);
-      }
+      // check if they're members
+      const member = await db.member.findFirst({
+        where: {
+          userId: session.user.id,
+          organization: {
+            namespaces: {
+              some: {
+                id: hosting.namespaceId,
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
 
       // if they're not a member, rewrite to not-allowed
-      if (!isMember) {
+      if (!member) {
         return NextResponse.rewrite(
           new URL(`/${hosting.id}/not-allowed`, req.url),
         );
