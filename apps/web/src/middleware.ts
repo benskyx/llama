@@ -24,6 +24,11 @@ export const config = {
 export function middleware(request: NextRequest, event: NextFetchEvent) {
   const { domain } = parse(request);
 
+  // Treat preview hosts under vercel.app as app traffic
+  if (domain.endsWith(".vercel.app")) {
+    return AppMiddleware(request, event);
+  }
+
   // for App
   if (APP_HOSTNAMES.has(domain)) {
     return AppMiddleware(request, event);
