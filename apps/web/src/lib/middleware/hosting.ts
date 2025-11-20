@@ -62,7 +62,7 @@ export default async function HostingMiddleware(
 
   // 404
   if (!hosting) {
-    return NextResponse.error();
+    return NextResponse.next();
   }
 
   const sessionCookie = getSessionCookie(req);
