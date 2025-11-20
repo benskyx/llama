@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { SHORT_DOMAIN } from "./constants";
+import { SHORT_DOMAIN } from "../constants";
 
 export const parse = (req: NextRequest) => {
   let domain = req.headers.get("host") as string;

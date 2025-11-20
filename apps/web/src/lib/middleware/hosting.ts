@@ -7,7 +7,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import type { Prisma } from "@agentset/db";
 import { db } from "@agentset/db";
 
-import { HOSTING_PREFIX } from "./constants";
+import { HOSTING_PREFIX } from "../constants";
 import { getMiddlewareSession } from "./get-session";
 
 const getHosting = async (where: Prisma.HostingWhereInput) => {

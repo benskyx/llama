@@ -5,7 +5,7 @@ import { getSessionCookie } from "better-auth/cookies";
 
 import { db } from "@agentset/db";
 
-import { HOSTING_PREFIX } from "./constants";
+import { HOSTING_PREFIX } from "../constants";
 import { getMiddlewareSession } from "./get-session";
 import HostingMiddleware from "./hosting";
 
