@@ -14,9 +14,9 @@ interface ResendEmailOptions extends Omit<CreateEmailOptions, "to" | "from"> {
 }
 
 const VARIANT_TO_FROM_MAP = {
-  primary: "Agentset.ai <system@agentset.ai>",
-  notifications: "Agentset.ai <notifications@agentset.ai>", // TODO: change domain to mail.
-  marketing: "Abdellatif from Agentset.ai <contact@agentset.ai>", // TODO: change domain to ship.
+  primary: "LLama <system@updates.thenewgravity.com>",
+  notifications: "Llama <notifications@updates.thenewgravity.com>", // TODO: change domain to mail.
+  marketing: "Manuel from Llama <contact@updates.thenewgravity.com>", // TODO: change domain to ship.
 };
 
 export const sendEmail = async (opts: ResendEmailOptions) => {
@@ -47,7 +47,7 @@ export const sendEmail = async (opts: ResendEmailOptions) => {
     to: email,
     from: from || VARIANT_TO_FROM_MAP[variant],
     bcc: bcc,
-    replyTo: replyTo || "support@agentset.ai",
+    replyTo: replyTo || "support@updates.thenewgravity.com",
     subject,
     text,
     react,
