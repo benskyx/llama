@@ -5,6 +5,14 @@ import { APP_DOMAIN } from "./constants";
 export function getBaseUrl() {
   if (typeof window !== "undefined") return window.location.origin;
 
+  // Prefer VERCEL_URL on preview/staging deploys so emails use the actual preview hostname
+  if (
+    process.env.VERCEL_URL &&
+    env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+  ) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
   if (env.NODE_ENV === "production") return APP_DOMAIN;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
 
