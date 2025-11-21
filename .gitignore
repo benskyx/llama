@@ -52,3 +52,6 @@ dist/
 .turbo
 
 *.local.*
+
+# internal docs
+internal-docs/
