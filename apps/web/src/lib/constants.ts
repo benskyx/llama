@@ -5,14 +5,14 @@ export const SHORT_DOMAIN = env.NEXT_PUBLIC_APP_SHORT_DOMAIN;
 
 const localHost = `localhost:${process.env.PORT ?? 3000}`;
 export const APP_HOSTNAMES = new Set([
-  `app.${SHORT_DOMAIN}`,
+  SHORT_DOMAIN,
   `staging.${SHORT_DOMAIN}`,
   localHost,
 ]);
 
 export const APP_DOMAIN =
   env.NEXT_PUBLIC_VERCEL_ENV === "production"
-    ? `https://app.${SHORT_DOMAIN}`
+    ? `https://${SHORT_DOMAIN}`
     : env.NEXT_PUBLIC_VERCEL_ENV === "preview"
       ? `https://staging.${SHORT_DOMAIN}`
       : `http://${localHost}`;
